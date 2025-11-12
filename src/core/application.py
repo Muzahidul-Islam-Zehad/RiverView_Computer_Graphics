@@ -10,6 +10,10 @@ from core.shader import Shader
 from core.camera import Camera
 from objects.terrain import Terrain
 from objects.house import House
+from objects.bridge import Bridge
+from objects.road import Road
+from objects.car import Car
+from objects.tree import Tree
 from utils.transformations import create_projection_matrix, create_projection_matrix_from_camera
 
 class Application:
@@ -20,6 +24,11 @@ class Application:
         self.terrain = None
         self.house = None
         self.camera = None
+        self.bridge = None
+        self.road = None
+        self.car1 = None
+        self.car2 = None
+        self.trees = []
         
         # Mouse handling
         self.first_mouse = True
@@ -82,6 +91,19 @@ class Application:
             self.camera = Camera()
             self.terrain = Terrain(self.shader)
             self.house = House(self.shader)
+            
+            # NEW OBJECTS
+            self.bridge = Bridge(self.shader)
+            self.road = Road(self.shader)
+            self.car1 = Car(self.shader)
+            self.car2 = Car(self.shader)
+            
+            # Create multiple trees
+            self.trees = []
+            for i in range(5):
+                tree = Tree(self.shader)
+                self.trees.append(tree)
+                
         except Exception as e:
             print(f"Initialization error: {e}")
             import traceback
@@ -147,12 +169,38 @@ class Application:
         )
         
         # Lighting setup
-        light_pos = (10.0, 10.0, 10.0)  # Light position in world space
+        light_pos = (10.0, 10.0, 10.0)
         view_pos = (self.camera.position.x, self.camera.position.y, self.camera.position.z)
         
-        # Draw objects with lighting
+        # Update animated objects
+        self.car1.update(delta_time)
+        self.car2.update(delta_time)
+        
+        # Draw all objects
         self.terrain.draw(view, projection, light_pos, view_pos)
+        self.road.draw(view, projection, light_pos, view_pos)
+        self.bridge.draw(view, projection, light_pos, view_pos)
         self.house.draw(view, projection, light_pos, view_pos, position=(5.0, 0.5, 0.0))
+        
+        # Draw cars (position them differently)
+        self.car1.draw(view, projection, light_pos, view_pos)
+        
+        # Second car with offset
+        self.car2.position[2] = self.car1.position[2] - 4.0  # Follow first car
+        self.car2.draw(view, projection, light_pos, view_pos)
+        
+        # Draw trees around the house
+        tree_positions = [
+            (6.0, 0.0, 2.0),
+            (7.0, 0.0, -1.0),
+            (4.0, 0.0, 3.0),
+            (5.5, 0.0, -2.5),
+            (3.5, 0.0, -1.5)
+        ]
+        
+        for i, tree in enumerate(self.trees):
+            if i < len(tree_positions):
+                tree.draw(view, projection, light_pos, view_pos, tree_positions[i])
         
         # Draw ship
         self._draw_ship(view, projection, light_pos, view_pos)
@@ -162,10 +210,18 @@ class Application:
         from rendering.mesh import Mesh
         from objects.primitives import create_cube_with_uv
         from utils.transformations import create_model_matrix
-        
+
         ship_mesh = Mesh(create_cube_with_uv())
-        model = create_model_matrix(position=(-3.0, 0.5, 0.0), scale=(1.5, 0.5, 0.8))
-        
+
+        # Animate ship movement
+        ship_time = glfw.get_time()
+        ship_z = np.sin(ship_time * 0.5) * 2.0  # Gentle back-and-forth movement
+
+        model = create_model_matrix(
+            position=(-3.0, 0.5, ship_z),
+            scale=(1.5, 0.5, 0.8)
+        )
+
         self.shader.use()
         self.shader.set_mat4("model", model)
         self.shader.set_mat4("view", view)
