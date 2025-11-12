@@ -1,29 +1,47 @@
 #version 330 core
-
-in vec3 vPos;
-in vec3 vNormal;
-in vec2 vTexCoord;
-
 out vec4 FragColor;
 
-uniform sampler2D texture0;
-uniform vec3 waterColor;
+in vec3 FragPos;
+in vec3 Normal;
+in vec2 TexCoords;
+
 uniform vec3 lightPos;
 uniform vec3 viewPos;
-uniform float transparency;
+uniform vec3 lightColor;
+uniform vec3 objectColor;
+uniform float time;
 
 void main()
 {
-    // Water with transparency and light reflection
-    vec3 norm = normalize(vNormal);
-    vec3 lightDir = normalize(lightPos - vPos);
+    // Water-specific lighting
+    float ambientStrength = 0.3;
+    vec3 ambient = ambientStrength * lightColor;
+    
+    // Diffuse with wave effects
+    vec3 norm = normalize(Normal);
+    vec3 lightDir = normalize(lightPos - FragPos);
     float diff = max(dot(norm, lightDir), 0.0);
     
-    vec3 viewDir = normalize(viewPos - vPos);
+    // Add specular highlights for water shine
+    float specularStrength = 0.5;
+    vec3 viewDir = normalize(viewPos - FragPos);
     vec3 reflectDir = reflect(-lightDir, norm);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 64.0);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 128.0);
+    vec3 specular = specularStrength * spec * lightColor;
     
-    vec3 result = waterColor * (0.3 + diff * 0.7) + vec3(1.0) * spec * 0.8;
+    // Water color with depth and time variation
+    vec3 waterColor = objectColor;
     
-    FragColor = vec4(result, transparency);
+    // Depth-based color variation
+    float depth = abs(FragPos.y);
+    waterColor *= (1.0 - depth * 0.5);
+    
+    // Time-based color variation (subtle)
+    waterColor.g += sin(time * 0.3) * 0.05;
+    
+    // Final color calculation
+    vec3 result = (ambient + diff * lightColor + specular) * waterColor;
+    
+    // Water transparency - more opaque for realism
+    FragColor = vec4(result, 0.95);
 }

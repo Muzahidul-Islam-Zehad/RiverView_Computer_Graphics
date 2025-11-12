@@ -14,6 +14,7 @@ from objects.bridge import Bridge
 from objects.road import Road
 from objects.car import Car
 from objects.tree import Tree
+from objects.water import Water
 from utils.transformations import create_projection_matrix, create_projection_matrix_from_camera
 
 class Application:
@@ -29,6 +30,7 @@ class Application:
         self.car1 = None
         self.car2 = None
         self.trees = []
+        self.water = None
         
         # Mouse handling
         self.first_mouse = True
@@ -83,6 +85,8 @@ class Application:
         
         # OpenGL configuration
         gl.glEnable(gl.GL_DEPTH_TEST)
+        gl.glEnable(gl.GL_BLEND)  # NEW: Enable blending for transparency
+        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)  # NEW: Standard blending
         gl.glClearColor(*BACKGROUND_COLOR)
         
         # Load shader and objects - USE TEXTURED SHADER
@@ -97,6 +101,9 @@ class Application:
             self.road = Road(self.shader)
             self.car1 = Car(self.shader)
             self.car2 = Car(self.shader)
+
+            self.water_shader = Shader("assets/shaders/water.vert", "assets/shaders/water.frag")
+            self.water = Water(self.water_shader)
             
             # Create multiple trees
             self.trees = []
@@ -158,6 +165,67 @@ class Application:
             self.camera.process_keyboard("DOWN", delta_time)
     
     def _render(self, delta_time):
+        """Render the scene with proper depth ordering."""
+        if not self.shader:
+            return
+            
+        # Create matrices using camera
+        view = self.camera.get_view_matrix_array()
+        projection = create_projection_matrix_from_camera(
+            self.camera, WINDOW_WIDTH/WINDOW_HEIGHT, NEAR_PLANE, FAR_PLANE
+        )
+        
+        # Golden hour lighting
+        current_time = glfw.get_time()
+        light_x = 5.0 * np.cos(current_time * 0.1)
+        light_y = 8.0
+        light_z = 5.0 * np.sin(current_time * 0.1)
+        light_pos = (light_x, light_y, light_z)
+        
+        view_pos = (self.camera.position.x, self.camera.position.y, self.camera.position.z)
+        
+        # Update animated objects
+        self.car1.update(delta_time)
+        self.car2.update(delta_time)
+        self.water.update(delta_time)
+        
+        # Set time uniform for shaders
+        self.shader.use()
+        self.shader.set_float("time", current_time)
+        
+        # PROPER RENDER ORDER:
+        # 1. Draw terrain (ground and river bed)
+        self.terrain.draw(view, projection, light_pos, view_pos)
+        
+        # 2. Draw water (will blend properly with river bed)
+        self.water.draw(view, projection, light_pos, view_pos)
+        
+        # 3. Draw objects that sit on terrain
+        self.road.draw(view, projection, light_pos, view_pos)
+        self.bridge.draw(view, projection, light_pos, view_pos)
+        self.house.draw(view, projection, light_pos, view_pos, position=(5.0, 0.5, 0.0))
+        
+        # 4. Draw moving objects
+        self.car1.draw(view, projection, light_pos, view_pos)
+        self.car2.position[2] = self.car1.position[2] - 4.0
+        self.car2.draw(view, projection, light_pos, view_pos)
+        
+        # 5. Draw trees
+        tree_positions = [
+            (6.0, 0.0, 2.0),
+            (7.0, 0.0, -1.0),
+            (4.0, 0.0, 3.0),
+            (5.5, 0.0, -2.5),
+            (3.5, 0.0, -1.5)
+        ]
+        
+        for i, tree in enumerate(self.trees):
+            if i < len(tree_positions):
+                tree.draw(view, projection, light_pos, view_pos, tree_positions[i])
+        
+        # 6. Draw ship (floats on water)
+        self._draw_ship(view, projection, light_pos, view_pos)
+        
         """Render the scene."""
         if not self.shader:
             return
@@ -168,25 +236,37 @@ class Application:
             self.camera, WINDOW_WIDTH/WINDOW_HEIGHT, NEAR_PLANE, FAR_PLANE
         )
         
-        # Lighting setup
-        light_pos = (10.0, 10.0, 10.0)
+        # Golden hour lighting - lower, warmer light
+        current_time = glfw.get_time()
+        light_x = 5.0 * np.cos(current_time * 0.1)  # Moving light for dynamic effect
+        light_y = 8.0  # Lower sun position for golden hour
+        light_z = 5.0 * np.sin(current_time * 0.1)
+        light_pos = (light_x, light_y, light_z)
+        
         view_pos = (self.camera.position.x, self.camera.position.y, self.camera.position.z)
         
         # Update animated objects
         self.car1.update(delta_time)
         self.car2.update(delta_time)
+        self.water.update(delta_time)  # NEW: Update water animation
         
-        # Draw all objects
+        # Set time uniform for shaders (for day/night cycle effects)
+        self.shader.use()
+        self.shader.set_float("time", current_time)
+        
+        # Draw all objects in correct order
         self.terrain.draw(view, projection, light_pos, view_pos)
         self.road.draw(view, projection, light_pos, view_pos)
         self.bridge.draw(view, projection, light_pos, view_pos)
+        
+        # Draw water (before house and trees for proper blending)
+        self.water.draw(view, projection, light_pos, view_pos)
+        
         self.house.draw(view, projection, light_pos, view_pos, position=(5.0, 0.5, 0.0))
         
-        # Draw cars (position them differently)
+        # Draw cars
         self.car1.draw(view, projection, light_pos, view_pos)
-        
-        # Second car with offset
-        self.car2.position[2] = self.car1.position[2] - 4.0  # Follow first car
+        self.car2.position[2] = self.car1.position[2] - 4.0
         self.car2.draw(view, projection, light_pos, view_pos)
         
         # Draw trees around the house
@@ -206,6 +286,75 @@ class Application:
         self._draw_ship(view, projection, light_pos, view_pos)
     
     def _draw_ship(self, view, projection, light_pos, view_pos):
+        """Draw a ship that properly floats on water."""
+        from rendering.mesh import Mesh
+        from objects.primitives import create_cube_with_uv
+        from utils.transformations import create_model_matrix
+
+        ship_mesh = Mesh(create_cube_with_uv())
+
+        # Animate ship movement
+        ship_time = glfw.get_time()
+        ship_z = np.sin(ship_time * 0.5) * 2.0
+        
+        # Realistic wave-riding calculation
+        wave_x = -3.0  # Ship X position (over river)
+        wave_height = (np.sin(wave_x * 3.0 + ship_time * 1.5) * 0.02 +
+                    np.cos(ship_z * 2.0 + ship_time * 1.0) * 0.015 +
+                    np.sin(wave_x * 5.0 + ship_z * 3.0 + ship_time * 2.0) * 0.01)
+        
+        # Ship floats on water surface (water is at Y=0, ship sits on top)
+        ship_y = 0.3 + wave_height  # Ship height above water + wave effect
+
+        # Gentle rocking based on waves
+        rock_angle = np.cos(ship_z * 2.0 + ship_time * 1.5) * 3.0  # Small angle
+
+        model = create_model_matrix(
+            position=(-3.0, ship_y, ship_z),
+            rotation=(rock_angle, 0, 0),  # Gentle rocking motion
+            scale=(1.5, 0.3, 0.8)  # Flatter ship
+        )
+
+        self.shader.use()
+        self.shader.set_mat4("model", model)
+        self.shader.set_mat4("view", view)
+        self.shader.set_mat4("projection", projection)
+        self.shader.set_vec3("lightPos", light_pos)
+        self.shader.set_vec3("viewPos", view_pos)
+        self.shader.set_vec3("lightColor", (1.0, 1.0, 1.0))
+        self.shader.set_vec3("objectColor", (0.2, 0.2, 0.3))
+        ship_mesh.draw(self.shader)
+        """Draw a ship that floats on water."""
+        from rendering.mesh import Mesh
+        from objects.primitives import create_cube_with_uv
+        from utils.transformations import create_model_matrix
+
+        ship_mesh = Mesh(create_cube_with_uv())
+
+        # Animate ship movement with wave synchronization
+        ship_time = glfw.get_time()
+        ship_z = np.sin(ship_time * 0.5) * 2.0
+        
+        # Make ship float on water surface
+        wave_height = np.sin(ship_z * 4.0 + ship_time * 2.0) * 0.05
+        ship_y = 0.5 + wave_height  # Float with waves
+
+        model = create_model_matrix(
+            position=(-3.0, ship_y, ship_z),  # Animated Y position
+            rotation=(wave_height * 10.0, 0, 0),  # Gentle rocking
+            scale=(1.5, 0.5, 0.8)
+        )
+
+        self.shader.use()
+        self.shader.set_mat4("model", model)
+        self.shader.set_mat4("view", view)
+        self.shader.set_mat4("projection", projection)
+        self.shader.set_vec3("lightPos", light_pos)
+        self.shader.set_vec3("viewPos", view_pos)
+        self.shader.set_vec3("lightColor", (1.0, 1.0, 1.0))
+        self.shader.set_vec3("objectColor", (0.2, 0.2, 0.3))  # Darker ship color
+        ship_mesh.draw(self.shader)
+        
         """Draw a simple ship."""
         from rendering.mesh import Mesh
         from objects.primitives import create_cube_with_uv
