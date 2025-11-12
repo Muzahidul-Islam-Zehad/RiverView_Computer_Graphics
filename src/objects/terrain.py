@@ -1,9 +1,10 @@
 """
-Terrain class with proper river channel.
+Terrain class with textures.
 """
 
 import numpy as np
 from rendering.mesh import Mesh
+from core.texture import Texture
 from utils.transformations import create_model_matrix
 
 class Terrain:
@@ -11,36 +12,28 @@ class Terrain:
         self.shader = shader
         self.ground_mesh = None
         self.river_channel_mesh = None
+        self.grass_texture = None
         
         self._setup_terrain()
     
-    
     def _create_river_channel_vertices(self):
-        """Create vertices for a river channel with proper normals."""
+        """Create vertices for river channel."""
         vertices = []
-        
-        # River channel dimensions
         width = 8.0
         length = 20.0
         depth = 0.3
-        
         segments_x = 10
         segments_z = 20
         
         for i in range(segments_z):
             for j in range(segments_x):
-                # Calculate vertex positions
                 x = -width/2 + (width / segments_x) * j
                 z = -length/2 + (length / segments_z) * i
-                
-                # Calculate next vertices
                 x1 = -width/2 + (width / segments_x) * (j + 1)
                 z1 = -length/2 + (length / segments_z) * (i + 1)
                 
-                # RIVER CHANNEL NORMALS - pointing UP (0,1,0)
                 normal_x, normal_y, normal_z = 0.0, 1.0, 0.0
                 
-                # Create two triangles for each quad
                 # Triangle 1
                 vertices.extend([x, -depth, z,  normal_x, normal_y, normal_z,  j/segments_x, i/segments_z])
                 vertices.extend([x1, -depth, z,  normal_x, normal_y, normal_z,  (j+1)/segments_x, i/segments_z])
@@ -54,35 +47,44 @@ class Terrain:
         return np.array(vertices, dtype=np.float32)
 
     def _create_ground_vertices(self):
-        """Create vertices for the ground plane with proper normals."""
+        """Create vertices for ground with proper texture coordinates."""
         size = 30.0
         half = size / 2.0
-        
-        # GROUND NORMALS - pointing UP (0,1,0)
         normal_x, normal_y, normal_z = 0.0, 1.0, 0.0
         
         vertices = [
-            # Ground plane - lowered so water sits above it
-            -half, -0.2, -half,  normal_x, normal_y, normal_z,  0.0, 0.0,
-            half, -0.2, -half,  normal_x, normal_y, normal_z,  1.0, 0.0,
-            half, -0.2,  half,  normal_x, normal_y, normal_z,  1.0, 1.0,
-            half, -0.2,  half,  normal_x, normal_y, normal_z,  1.0, 1.0,
-            -half, -0.2,  half,  normal_x, normal_y, normal_z,  0.0, 1.0,
-            -half, -0.2, -half,  normal_x, normal_y, normal_z,  0.0, 0.0,
+            # Position (3), Normal (3), Texture Coords (2)
+            # Triangle 1
+            -half, -0.05, -half,  normal_x, normal_y, normal_z,  0.0, 0.0,
+            half, -0.05, -half,  normal_x, normal_y, normal_z,  1.0, 0.0,
+            half, -0.05,  half,  normal_x, normal_y, normal_z,  1.0, 1.0,
+            
+            # Triangle 2  
+            half, -0.05,  half,  normal_x, normal_y, normal_z,  1.0, 1.0,
+            -half, -0.05,  half,  normal_x, normal_y, normal_z,  0.0, 1.0,
+            -half, -0.05, -half,  normal_x, normal_y, normal_z,  0.0, 0.0,
         ]
         
         return np.array(vertices, dtype=np.float32)
     
     def _setup_terrain(self):
-        """Setup ground and river channel meshes."""
+        """Setup ground and river channel with textures."""
         ground_vertices = self._create_ground_vertices()
         river_vertices = self._create_river_channel_vertices()
         
-        self.ground_mesh = Mesh(ground_vertices)
+        # Load texture with debug info
+        try:
+            self.grass_texture = Texture("assets/textures/grass.png")
+            print(f"✅ Grass texture loaded: {self.grass_texture.texture_id}")
+        except Exception as e:
+            print(f"❌ Grass texture failed: {e}")
+            self.grass_texture = None
+        
+        self.ground_mesh = Mesh(ground_vertices, texture=self.grass_texture)
         self.river_channel_mesh = Mesh(river_vertices)
     
     def draw(self, view, projection, light_pos, view_pos):
-        """Draw the terrain."""
+        """Draw the terrain - FORCE TEXTURE."""
         self.shader.use()
         self.shader.set_mat4("view", view)
         self.shader.set_mat4("projection", projection)
@@ -90,11 +92,15 @@ class Terrain:
         self.shader.set_vec3("viewPos", view_pos)
         self.shader.set_vec3("lightColor", (1.0, 1.0, 1.0))
         
-        # Draw ground
+        # Draw ground WITH TEXTURE FORCED
         ground_model = create_model_matrix(position=(0.0, 0.0, 0.0))
         self.shader.set_mat4("model", ground_model)
-        self.shader.set_vec3("objectColor", (0.2, 0.8, 0.2))  # Green ground
+        self.shader.set_bool("useTexture", True)  # FORCE TEXTURE
         self.ground_mesh.draw(self.shader)
         
-        # NOTE: River channel is now rendered by the Water object with proper shader
-        # Don't render it here with the default shader
+        # Draw river channel WITHOUT TEXTURE
+        river_channel_model = create_model_matrix(position=(-3.0, 0.0, 0.0))
+        self.shader.set_mat4("model", river_channel_model)
+        self.shader.set_bool("useTexture", False)  # No texture
+        self.shader.set_vec3("objectColor", (0.6, 0.5, 0.3))
+        self.river_channel_mesh.draw(self.shader)

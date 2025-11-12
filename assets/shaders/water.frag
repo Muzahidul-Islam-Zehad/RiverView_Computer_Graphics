@@ -9,11 +9,21 @@ uniform vec3 lightPos;
 uniform vec3 viewPos;
 uniform vec3 lightColor;
 uniform float time;
+uniform sampler2D texture0;
+uniform bool useTexture;
 
 void main()
 {
-    // Beautiful water blue color
-    vec3 waterBaseColor = vec3(0.1, 0.6, 0.95); // Deep blue-cyan
+    // Water base color - either from texture or hardcoded blue
+    vec3 waterBaseColor;
+    if (useTexture)
+    {
+        waterBaseColor = texture(texture0, TexCoords).rgb;
+    }
+    else
+    {
+        waterBaseColor = vec3(0.1, 0.6, 0.95); // Deep blue-cyan
+    }
     
     // Ambient light
     float ambient = 0.5;
