@@ -50,3 +50,6 @@ def create_projection_matrix(fov, aspect_ratio, near_plane, far_plane):
         far_plane
     )
     return glm_to_array(projection)
+def create_projection_matrix_from_camera(camera, aspect_ratio, near_plane, far_plane):
+    """Create projection matrix using camera zoom."""
+    return create_projection_matrix(camera.zoom, aspect_ratio, near_plane, far_plane)

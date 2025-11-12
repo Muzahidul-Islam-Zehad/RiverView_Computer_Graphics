@@ -1,90 +1,101 @@
 """
-Camera class for controlling view and projection matrices.
+Camera class for 3D navigation with mouse look.
 """
 
+import glm
 import numpy as np
-from glm import mat4, vec3, lookAt, perspective, radians
-
 
 class Camera:
-    """Manages camera position, view, and projection matrices."""
-
-    def __init__(self, position, target, up, fov=45.0, aspect=1.33, near=0.1, far=100.0):
-        """
-        Initialize the camera.
+    def __init__(self):
+        # Camera attributes
+        self.position = glm.vec3(0.0, 3.0, 10.0)
+        self.front = glm.vec3(0.0, 0.0, -1.0)
+        self.up = glm.vec3(0.0, 1.0, 0.0)
+        self.right = glm.vec3(1.0, 0.0, 0.0)
+        self.world_up = glm.vec3(0.0, 1.0, 0.0)
         
-        Args:
-            position: Initial camera position (vec3 or tuple)
-            target: Look-at target (vec3 or tuple)
-            up: Up vector (vec3 or tuple)
-            fov: Field of view in degrees
-            aspect: Aspect ratio (width/height)
-            near: Near clipping plane
-            far: Far clipping plane
-        """
-        self.position = vec3(position)
-        self.target = vec3(target)
-        self.up = vec3(up)
-        self.fov = fov
-        self.aspect = aspect
-        self.near = near
-        self.far = far
-
+        # Euler angles
+        self.yaw = -90.0
+        self.pitch = 0.0
+        
+        # Camera options
+        self.movement_speed = 5.0
+        self.mouse_sensitivity = 0.1
+        self.zoom = 45.0
+        
+        # Update camera vectors
+        self._update_camera_vectors()
+    
     def get_view_matrix(self):
         """Return the view matrix."""
-        return lookAt(self.position, self.target, self.up)
-
-    def get_projection_matrix(self):
-        """Return the projection matrix."""
-        return perspective(radians(self.fov), self.aspect, self.near, self.far)
-
-    def move(self, direction, distance):
-        """
-        Move the camera in a given direction.
+        return glm.lookAt(self.position, self.position + self.front, self.up)
+    
+    def get_view_matrix_array(self):
+        """Return view matrix as numpy array for OpenGL."""
+        view = self.get_view_matrix()
+        return self._glm_to_array(view)
+    
+    def process_keyboard(self, direction, delta_time):
+        """Process keyboard input for camera movement."""
+        velocity = self.movement_speed * delta_time
         
-        Args:
-            direction: Direction vector (vec3)
-            distance: Distance to move
-        """
-        direction = vec3(direction)
-        self.position += direction * distance
-        self.target += direction * distance
-
-    def pan(self, right, up):
-        """
-        Pan the camera (strafe and vertical movement).
+        if direction == "FORWARD":
+            self.position += self.front * velocity
+        if direction == "BACKWARD":
+            self.position -= self.front * velocity
+        if direction == "LEFT":
+            self.position -= self.right * velocity
+        if direction == "RIGHT":
+            self.position += self.right * velocity
+        if direction == "UP":
+            self.position += self.world_up * velocity
+        if direction == "DOWN":
+            self.position -= self.world_up * velocity
+    
+    def process_mouse_movement(self, xoffset, yoffset, constrain_pitch=True):
+        """Process mouse movement for camera look."""
+        xoffset *= self.mouse_sensitivity
+        yoffset *= self.mouse_sensitivity
         
-        Args:
-            right: Strafe distance (positive = right)
-            up: Vertical distance (positive = up)
-        """
-        forward = self.target - self.position
-        right_vec = np.cross([forward.x, forward.y, forward.z], [self.up.x, self.up.y, self.up.z])
-        right_vec = right_vec / (np.linalg.norm(right_vec) + 1e-6)
+        self.yaw += xoffset
+        self.pitch += yoffset
         
-        self.position += vec3(right_vec) * right
-        self.target += vec3(right_vec) * right
+        # Constrain pitch to avoid flip
+        if constrain_pitch:
+            if self.pitch > 89.0:
+                self.pitch = 89.0
+            if self.pitch < -89.0:
+                self.pitch = -89.0
         
-        self.position += self.up * up
-        self.target += self.up * up
-
-    def rotate(self, yaw, pitch):
-        """
-        Rotate the camera around its position (FPS-style).
+        # Update camera vectors
+        self._update_camera_vectors()
+    
+    def process_mouse_scroll(self, yoffset):
+        """Process mouse scroll for zoom."""
+        self.zoom -= yoffset
+        if self.zoom < 1.0:
+            self.zoom = 1.0
+        if self.zoom > 45.0:
+            self.zoom = 45.0
+    
+    def _update_camera_vectors(self):
+        """Update camera vectors based on yaw and pitch."""
+        # Calculate new front vector
+        front = glm.vec3()
+        front.x = glm.cos(glm.radians(self.yaw)) * glm.cos(glm.radians(self.pitch))
+        front.y = glm.sin(glm.radians(self.pitch))
+        front.z = glm.sin(glm.radians(self.yaw)) * glm.cos(glm.radians(self.pitch))
         
-        Args:
-            yaw: Horizontal rotation in degrees
-            pitch: Vertical rotation in degrees
-        """
-        # This would require more complex implementation with quaternions
-        # Simplified version - can be expanded
-        pass
-
-    def zoom(self, factor):
-        """
-        Zoom in/out by adjusting FOV.
+        self.front = glm.normalize(front)
         
-        Args:
-            factor: Zoom factor (positive = zoom in)
-        """
-        self.fov = max(5.0, min(90.0, self.fov - factor))
+        # Re-calculate right and up vectors
+        self.right = glm.normalize(glm.cross(self.front, self.world_up))
+        self.up = glm.normalize(glm.cross(self.right, self.front))
+    
+    def _glm_to_array(self, matrix):
+        """Convert glm matrix to numpy array."""
+        arr = np.zeros(16, dtype=np.float32)
+        for i in range(4):
+            for j in range(4):
+                arr[i*4 + j] = matrix[i][j]
+        return arr
