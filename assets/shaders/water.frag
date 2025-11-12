@@ -8,40 +8,32 @@ in vec2 TexCoords;
 uniform vec3 lightPos;
 uniform vec3 viewPos;
 uniform vec3 lightColor;
-uniform vec3 objectColor;
 uniform float time;
 
 void main()
 {
-    // Water-specific lighting
-    float ambientStrength = 0.3;
-    vec3 ambient = ambientStrength * lightColor;
+    // Beautiful water blue color
+    vec3 waterBaseColor = vec3(0.1, 0.6, 0.95); // Deep blue-cyan
     
-    // Diffuse with wave effects
+    // Ambient light
+    float ambient = 0.5;
+    
+    // Diffuse lighting
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(lightPos - FragPos);
-    float diff = max(dot(norm, lightDir), 0.0);
+    float diffuse = max(dot(norm, lightDir), 0.0) * 0.6;
     
-    // Add specular highlights for water shine
-    float specularStrength = 0.5;
+    // Specular highlights for water reflections
     vec3 viewDir = normalize(viewPos - FragPos);
     vec3 reflectDir = reflect(-lightDir, norm);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 128.0);
-    vec3 specular = specularStrength * spec * lightColor;
+    float specular = pow(max(dot(viewDir, reflectDir), 0.0), 64.0) * 0.8;
     
-    // Water color with depth and time variation
-    vec3 waterColor = objectColor;
+    // Add subtle wave animation to color
+    float wave_effect = sin(TexCoords.x * 3.0 + time * 0.5) * 0.05;
     
-    // Depth-based color variation
-    float depth = abs(FragPos.y);
-    waterColor *= (1.0 - depth * 0.5);
+    // Combine all effects
+    vec3 result = waterBaseColor * (ambient + diffuse) + lightColor * specular;
+    result += wave_effect * 0.1;
     
-    // Time-based color variation (subtle)
-    waterColor.g += sin(time * 0.3) * 0.05;
-    
-    // Final color calculation
-    vec3 result = (ambient + diff * lightColor + specular) * waterColor;
-    
-    // Water transparency - more opaque for realism
-    FragColor = vec4(result, 0.95);
+    FragColor = vec4(result, 0.85);  // Slightly transparent water
 }

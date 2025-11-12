@@ -85,27 +85,31 @@ class Application:
         
         # OpenGL configuration
         gl.glEnable(gl.GL_DEPTH_TEST)
-        gl.glEnable(gl.GL_BLEND)  # NEW: Enable blending for transparency
-        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)  # NEW: Standard blending
+        gl.glEnable(gl.GL_BLEND)
+        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
         gl.glClearColor(*BACKGROUND_COLOR)
         
-        # Load shader and objects - USE TEXTURED SHADER
+        # Load shaders and objects
         try:
+            # Load main shader for most objects
             self.shader = Shader("assets/shaders/textured.vert", "assets/shaders/textured.frag")
-            self.camera = Camera()
-            self.terrain = Terrain(self.shader)
-            self.house = House(self.shader)
+            print(f"Main shader loaded: program {self.shader.program_id}")
             
-            # NEW OBJECTS
+            # Load WATER SHADER - separate from main shader
+            self.water_shader = Shader("assets/shaders/water.vert", "assets/shaders/water.frag")
+            print(f"Water shader loaded: program {self.water_shader.program_id}")
+            
+            # Create objects
+            self.camera = Camera()
+            self.terrain = Terrain(self.shader)  # Uses main shader
+            self.house = House(self.shader)
             self.bridge = Bridge(self.shader)
             self.road = Road(self.shader)
             self.car1 = Car(self.shader)
             self.car2 = Car(self.shader)
-
-            self.water_shader = Shader("assets/shaders/water.vert", "assets/shaders/water.frag")
-            self.water = Water(self.water_shader)
+            self.water = Water(self.water_shader)  # Uses WATER shader
             
-            # Create multiple trees
+            # Create trees
             self.trees = []
             for i in range(5):
                 tree = Tree(self.shader)
@@ -118,13 +122,7 @@ class Application:
             return False
         
         print("Application initialized successfully!")
-        print("Controls:")
-        print("  WASD - Move camera")
-        print("  Mouse - Look around")
-        print("  Scroll - Zoom in/out")
-        print("  Space - Move up")
-        print("  Shift - Move down")
-        print("  ESC - Exit")
+        print("Controls: WASD, Mouse, Scroll, Space/Shift, ESC")
         return True
     
     def _main_loop(self):
@@ -175,7 +173,7 @@ class Application:
             self.camera, WINDOW_WIDTH/WINDOW_HEIGHT, NEAR_PLANE, FAR_PLANE
         )
         
-        # Golden hour lighting
+        # Lighting setup
         current_time = glfw.get_time()
         light_x = 5.0 * np.cos(current_time * 0.1)
         light_y = 8.0
@@ -189,18 +187,19 @@ class Application:
         self.car2.update(delta_time)
         self.water.update(delta_time)
         
-        # Set time uniform for shaders
+        # Set time uniform for main shader
         self.shader.use()
         self.shader.set_float("time", current_time)
         
-        # PROPER RENDER ORDER:
-        # 1. Draw terrain (ground and river bed)
+        # CORRECT RENDER ORDER:
+        
+        # 1. Draw terrain (ground and river channel) - uses main shader
         self.terrain.draw(view, projection, light_pos, view_pos)
         
-        # 2. Draw water (will blend properly with river bed)
+        # 2. Draw water - uses WATER SHADER (different from terrain!)
         self.water.draw(view, projection, light_pos, view_pos)
         
-        # 3. Draw objects that sit on terrain
+        # 3. Draw other objects - use main shader
         self.road.draw(view, projection, light_pos, view_pos)
         self.bridge.draw(view, projection, light_pos, view_pos)
         self.house.draw(view, projection, light_pos, view_pos, position=(5.0, 0.5, 0.0))
@@ -209,6 +208,10 @@ class Application:
         self.car1.draw(view, projection, light_pos, view_pos)
         self.car2.position[2] = self.car1.position[2] - 4.0
         self.car2.draw(view, projection, light_pos, view_pos)
+        
+        # DEBUG: Check which shader water is using
+        # print(f"Water shader program: {self.water.shader.program_id}")
+        # print(f"Main shader program: {self.shader.program_id}")
         
         # 5. Draw trees
         tree_positions = [
@@ -225,67 +228,51 @@ class Application:
         
         # 6. Draw ship (floats on water)
         self._draw_ship(view, projection, light_pos, view_pos)
-        
-        """Render the scene."""
-        if not self.shader:
-            return
-            
-        # Create matrices using camera
-        view = self.camera.get_view_matrix_array()
-        projection = create_projection_matrix_from_camera(
-            self.camera, WINDOW_WIDTH/WINDOW_HEIGHT, NEAR_PLANE, FAR_PLANE
-        )
-        
-        # Golden hour lighting - lower, warmer light
-        current_time = glfw.get_time()
-        light_x = 5.0 * np.cos(current_time * 0.1)  # Moving light for dynamic effect
-        light_y = 8.0  # Lower sun position for golden hour
-        light_z = 5.0 * np.sin(current_time * 0.1)
-        light_pos = (light_x, light_y, light_z)
-        
-        view_pos = (self.camera.position.x, self.camera.position.y, self.camera.position.z)
-        
-        # Update animated objects
-        self.car1.update(delta_time)
-        self.car2.update(delta_time)
-        self.water.update(delta_time)  # NEW: Update water animation
-        
-        # Set time uniform for shaders (for day/night cycle effects)
-        self.shader.use()
-        self.shader.set_float("time", current_time)
-        
-        # Draw all objects in correct order
-        self.terrain.draw(view, projection, light_pos, view_pos)
-        self.road.draw(view, projection, light_pos, view_pos)
-        self.bridge.draw(view, projection, light_pos, view_pos)
-        
-        # Draw water (before house and trees for proper blending)
-        self.water.draw(view, projection, light_pos, view_pos)
-        
-        self.house.draw(view, projection, light_pos, view_pos, position=(5.0, 0.5, 0.0))
-        
-        # Draw cars
-        self.car1.draw(view, projection, light_pos, view_pos)
-        self.car2.position[2] = self.car1.position[2] - 4.0
-        self.car2.draw(view, projection, light_pos, view_pos)
-        
-        # Draw trees around the house
-        tree_positions = [
-            (6.0, 0.0, 2.0),
-            (7.0, 0.0, -1.0),
-            (4.0, 0.0, 3.0),
-            (5.5, 0.0, -2.5),
-            (3.5, 0.0, -1.5)
-        ]
-        
-        for i, tree in enumerate(self.trees):
-            if i < len(tree_positions):
-                tree.draw(view, projection, light_pos, view_pos, tree_positions[i])
-        
-        # Draw ship
-        self._draw_ship(view, projection, light_pos, view_pos)
     
     def _draw_ship(self, view, projection, light_pos, view_pos):
+        """Draw a ship that floats in the river channel."""
+        from rendering.mesh import Mesh
+        from objects.primitives import create_cube_with_uv
+        from utils.transformations import create_model_matrix
+
+        ship_mesh = Mesh(create_cube_with_uv())
+
+        # Animate ship movement within river channel
+        ship_time = glfw.get_time()
+        ship_z = np.sin(ship_time * 0.5) * 8.0  # Wider movement range
+        
+        # Wave calculation matching water shader
+        wave_x = -3.0
+        wave1 = np.sin(wave_x * 3.0 + ship_time * 1.5) * 0.015
+        wave2 = np.cos(ship_z * 2.0 + ship_time * 1.0) * 0.01
+        wave3 = np.sin(wave_x * 5.0 + ship_z * 3.0 + ship_time * 2.0) * 0.005
+        wave_height = wave1 + wave2 + wave3
+        
+        # Clamp wave height for ship
+        if wave_height > 0.02: wave_height = 0.02
+        if wave_height < -0.02: wave_height = -0.02
+        
+        # Ship floats in river channel (water base at -0.25 + waves)
+        ship_y = -0.15 + wave_height  # Ship sits in water
+
+        # Gentle rocking
+        rock_angle = np.cos(ship_z * 2.0 + ship_time * 1.5) * 2.0  # Smaller angle
+
+        model = create_model_matrix(
+            position=(-3.0, ship_y, ship_z),
+            rotation=(rock_angle, 0, 0),
+            scale=(1.2, 0.2, 0.6)  # Smaller, flatter ship for channel
+        )
+
+        self.shader.use()
+        self.shader.set_mat4("model", model)
+        self.shader.set_mat4("view", view)
+        self.shader.set_mat4("projection", projection)
+        self.shader.set_vec3("lightPos", light_pos)
+        self.shader.set_vec3("viewPos", view_pos)
+        self.shader.set_vec3("lightColor", (1.0, 1.0, 1.0))
+        self.shader.set_vec3("objectColor", (0.2, 0.2, 0.3))
+        ship_mesh.draw(self.shader)
         """Draw a ship that properly floats on water."""
         from rendering.mesh import Mesh
         from objects.primitives import create_cube_with_uv

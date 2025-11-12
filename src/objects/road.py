@@ -1,5 +1,5 @@
 """
-Road class for the paved road along the riverbank.
+Road class positioned above water level.
 """
 
 import numpy as np
@@ -20,7 +20,7 @@ class Road:
         self.road_mesh = Mesh(road_vertices)
     
     def draw(self, view, projection, light_pos, view_pos):
-        """Draw the road."""
+        """Draw the road above water level."""
         self.shader.use()
         self.shader.set_mat4("view", view)
         self.shader.set_mat4("projection", projection)
@@ -28,12 +28,12 @@ class Road:
         self.shader.set_vec3("viewPos", view_pos)
         self.shader.set_vec3("lightColor", (1.0, 1.0, 1.0))
         
-        # Draw road
+        # Draw road ABOVE water level
         road_model = create_model_matrix(
-            position=(2.0, 0.01, 0.0),  # Slightly above ground
+            position=(2.0, 0.1, 0.0),  # Higher than water (0.1 vs -0.25)
             rotation=(0, 0, 0),
-            scale=(0.5, 1.0, 1.5)  # Make road narrower but longer
+            scale=(0.5, 1.0, 1.5)
         )
         self.shader.set_mat4("model", road_model)
-        self.shader.set_vec3("objectColor", (0.3, 0.3, 0.3))  # Dark gray asphalt
+        self.shader.set_vec3("objectColor", (0.3, 0.3, 0.3))
         self.road_mesh.draw(self.shader)
