@@ -17,9 +17,9 @@ void main()
     // Wave animation
     vec3 position = aPos;
     
-    float wave1 = sin(position.x * 3.0 + time * 1.5) * 0.015;
-    float wave2 = cos(position.z * 2.0 + time * 1.0) * 0.01;
-    float wave3 = sin(position.x * 5.0 + position.z * 3.0 + time * 2.0) * 0.005;
+    float wave1 = sin(position.x * 3.0 + time * 1.5) * 0.035;
+    float wave2 = cos(position.z * 2.0 + time * 1.0) * 0.025;
+    float wave3 = sin(position.x * 5.0 + position.z * 3.0 + time * 2.0) * 0.015;
     
     float total_wave = wave1 + wave2 + wave3;
     position.y += total_wave;

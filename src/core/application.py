@@ -5,6 +5,8 @@ Main application class with proper camera.
 import glfw
 import OpenGL.GL as gl
 import numpy as np
+import random
+import math
 from config import *
 from core.shader import Shader
 from core.camera import Camera
@@ -13,8 +15,11 @@ from objects.house import House
 from objects.bridge import Bridge
 from objects.road import Road
 from objects.car import Car
-from objects.tree import Tree
+from objects.advanced_tree import AdvancedTree
+from objects.log import Log
 from objects.water import Water
+from objects.mountain import Mountain
+from objects.advanced_mountain import AdvancedMountain
 from utils.transformations import create_projection_matrix, create_projection_matrix_from_camera
 
 class Application:
@@ -30,7 +35,9 @@ class Application:
         self.car1 = None
         self.car2 = None
         self.trees = []
+        self.logs = []
         self.water = None
+        self.mountains = []
         
         # Mouse handling
         self.first_mouse = True
@@ -109,11 +116,34 @@ class Application:
             self.car2 = Car(self.shader)
             self.water = Water(self.water_shader)  # Uses WATER shader
             
-            # Create trees
+            # Create advanced mountains
+            self.mountains = [
+                AdvancedMountain(self.shader, position=(7.0, -1.0, -12.0), size=12.0, max_height=8.0, seed=1),  # Right back (further back)
+                AdvancedMountain(self.shader, position=(10.0, -1.0, -3.0), size=12.0, max_height=8.0, seed=2),    # Right front
+            ]
+            
+            # Create advanced trees
             self.trees = []
             for i in range(5):
-                tree = Tree(self.shader)
+                tree = AdvancedTree(self.shader, height=1.2 + random.random() * 0.6, seed=i*10 + random.randint(0, 100))
                 self.trees.append(tree)
+            
+            # Create logs around trees
+            self.logs = []
+            tree_positions = [
+                (6.0, 0.0, 2.0),
+                (7.0, 0.0, -1.0),
+                (4.0, 0.0, 3.0),
+                (5.5, 0.0, -2.5),
+                (3.5, 0.0, -1.5)
+            ]
+            for tree_pos in tree_positions:
+                # One log per tree at the center
+                log = Log(self.shader)
+                # Position log at tree center
+                log_y = 0.5  # At middle of tree
+                log_pos = (tree_pos[0], log_y, tree_pos[2])
+                self.logs.append((log, log_pos, 0.0))
                 
         except Exception as e:
             print(f"Initialization error: {e}")
@@ -193,6 +223,10 @@ class Application:
         
         # CORRECT RENDER ORDER:
         
+        # 0. Draw advanced mountains (terrain generation with noise)
+        for mountain in self.mountains:
+            mountain.draw(view, projection, light_pos, view_pos)
+        
         # 1. Draw terrain (ground and river channel) - uses main shader
         self.terrain.draw(view, projection, light_pos, view_pos)
         
@@ -224,149 +258,12 @@ class Application:
         
         for i, tree in enumerate(self.trees):
             if i < len(tree_positions):
-                tree.draw(view, projection, light_pos, view_pos, tree_positions[i])
+                tree.position = tree_positions[i]
+                tree.draw(view, projection, light_pos, view_pos)
         
-        # 6. Draw ship (floats on water)
-        self._draw_ship(view, projection, light_pos, view_pos)
-    
-    def _draw_ship(self, view, projection, light_pos, view_pos):
-        """Draw a ship that floats in the river channel."""
-        from rendering.mesh import Mesh
-        from objects.primitives import create_cube_with_uv
-        from utils.transformations import create_model_matrix
-
-        ship_mesh = Mesh(create_cube_with_uv())
-
-        # Animate ship movement within river channel
-        ship_time = glfw.get_time()
-        ship_z = np.sin(ship_time * 0.5) * 8.0  # Wider movement range
-        
-        # Wave calculation matching water shader
-        wave_x = -3.0
-        wave1 = np.sin(wave_x * 3.0 + ship_time * 1.5) * 0.015
-        wave2 = np.cos(ship_z * 2.0 + ship_time * 1.0) * 0.01
-        wave3 = np.sin(wave_x * 5.0 + ship_z * 3.0 + ship_time * 2.0) * 0.005
-        wave_height = wave1 + wave2 + wave3
-        
-        # Clamp wave height for ship
-        if wave_height > 0.02: wave_height = 0.02
-        if wave_height < -0.02: wave_height = -0.02
-        
-        # Ship floats in river channel (water base at -0.25 + waves)
-        ship_y = -0.15 + wave_height  # Ship sits in water
-
-        # Gentle rocking
-        rock_angle = np.cos(ship_z * 2.0 + ship_time * 1.5) * 2.0  # Smaller angle
-
-        model = create_model_matrix(
-            position=(-3.0, ship_y, ship_z),
-            rotation=(rock_angle, 0, 0),
-            scale=(1.2, 0.2, 0.6)  # Smaller, flatter ship for channel
-        )
-
-        self.shader.use()
-        self.shader.set_mat4("model", model)
-        self.shader.set_mat4("view", view)
-        self.shader.set_mat4("projection", projection)
-        self.shader.set_vec3("lightPos", light_pos)
-        self.shader.set_vec3("viewPos", view_pos)
-        self.shader.set_vec3("lightColor", (1.0, 1.0, 1.0))
-        self.shader.set_vec3("objectColor", (0.2, 0.2, 0.3))
-        ship_mesh.draw(self.shader)
-        """Draw a ship that properly floats on water."""
-        from rendering.mesh import Mesh
-        from objects.primitives import create_cube_with_uv
-        from utils.transformations import create_model_matrix
-
-        ship_mesh = Mesh(create_cube_with_uv())
-
-        # Animate ship movement
-        ship_time = glfw.get_time()
-        ship_z = np.sin(ship_time * 0.5) * 2.0
-        
-        # Realistic wave-riding calculation
-        wave_x = -3.0  # Ship X position (over river)
-        wave_height = (np.sin(wave_x * 3.0 + ship_time * 1.5) * 0.02 +
-                    np.cos(ship_z * 2.0 + ship_time * 1.0) * 0.015 +
-                    np.sin(wave_x * 5.0 + ship_z * 3.0 + ship_time * 2.0) * 0.01)
-        
-        # Ship floats on water surface (water is at Y=0, ship sits on top)
-        ship_y = 0.3 + wave_height  # Ship height above water + wave effect
-
-        # Gentle rocking based on waves
-        rock_angle = np.cos(ship_z * 2.0 + ship_time * 1.5) * 3.0  # Small angle
-
-        model = create_model_matrix(
-            position=(-3.0, ship_y, ship_z),
-            rotation=(rock_angle, 0, 0),  # Gentle rocking motion
-            scale=(1.5, 0.3, 0.8)  # Flatter ship
-        )
-
-        self.shader.use()
-        self.shader.set_mat4("model", model)
-        self.shader.set_mat4("view", view)
-        self.shader.set_mat4("projection", projection)
-        self.shader.set_vec3("lightPos", light_pos)
-        self.shader.set_vec3("viewPos", view_pos)
-        self.shader.set_vec3("lightColor", (1.0, 1.0, 1.0))
-        self.shader.set_vec3("objectColor", (0.2, 0.2, 0.3))
-        ship_mesh.draw(self.shader)
-        """Draw a ship that floats on water."""
-        from rendering.mesh import Mesh
-        from objects.primitives import create_cube_with_uv
-        from utils.transformations import create_model_matrix
-
-        ship_mesh = Mesh(create_cube_with_uv())
-
-        # Animate ship movement with wave synchronization
-        ship_time = glfw.get_time()
-        ship_z = np.sin(ship_time * 0.5) * 2.0
-        
-        # Make ship float on water surface
-        wave_height = np.sin(ship_z * 4.0 + ship_time * 2.0) * 0.05
-        ship_y = 0.5 + wave_height  # Float with waves
-
-        model = create_model_matrix(
-            position=(-3.0, ship_y, ship_z),  # Animated Y position
-            rotation=(wave_height * 10.0, 0, 0),  # Gentle rocking
-            scale=(1.5, 0.5, 0.8)
-        )
-
-        self.shader.use()
-        self.shader.set_mat4("model", model)
-        self.shader.set_mat4("view", view)
-        self.shader.set_mat4("projection", projection)
-        self.shader.set_vec3("lightPos", light_pos)
-        self.shader.set_vec3("viewPos", view_pos)
-        self.shader.set_vec3("lightColor", (1.0, 1.0, 1.0))
-        self.shader.set_vec3("objectColor", (0.2, 0.2, 0.3))  # Darker ship color
-        ship_mesh.draw(self.shader)
-        
-        """Draw a simple ship."""
-        from rendering.mesh import Mesh
-        from objects.primitives import create_cube_with_uv
-        from utils.transformations import create_model_matrix
-
-        ship_mesh = Mesh(create_cube_with_uv())
-
-        # Animate ship movement
-        ship_time = glfw.get_time()
-        ship_z = np.sin(ship_time * 0.5) * 2.0  # Gentle back-and-forth movement
-
-        model = create_model_matrix(
-            position=(-3.0, 0.5, ship_z),
-            scale=(1.5, 0.5, 0.8)
-        )
-
-        self.shader.use()
-        self.shader.set_mat4("model", model)
-        self.shader.set_mat4("view", view)
-        self.shader.set_mat4("projection", projection)
-        self.shader.set_vec3("lightPos", light_pos)
-        self.shader.set_vec3("viewPos", view_pos)
-        self.shader.set_vec3("lightColor", (1.0, 1.0, 1.0))
-        self.shader.set_vec3("objectColor", (0.3, 0.3, 0.3))
-        ship_mesh.draw(self.shader)
+        # 5.5 Draw logs around trees
+        for log, log_pos, log_rot in self.logs:
+            log.draw(view, projection, light_pos, view_pos, log_pos, log_rot)
     
     def _shutdown(self):
         """Cleanup resources."""

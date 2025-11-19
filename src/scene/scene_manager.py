@@ -7,7 +7,6 @@ from src.core.shader import Shader
 from src.rendering.water import Water
 from src.objects.terrain import Terrain
 from src.objects.bridge import Bridge
-from src.objects.ship import Ship
 from src.objects.house import House
 from src.objects.primitives import create_plane
 import config
@@ -49,10 +48,6 @@ class SceneManager:
         # Bridge
         bridge = Bridge(position=(0, 0, 0))
         self.objects.append(bridge)
-        
-        # Ship
-        ship = Ship(position=(0, 1, 0), path_radius=5)
-        self.objects.append(ship)
         
         # House
         house = House(position=(10, -5, 0))

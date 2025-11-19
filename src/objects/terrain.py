@@ -52,17 +52,20 @@ class Terrain:
         half = size / 2.0
         normal_x, normal_y, normal_z = 0.0, 1.0, 0.0
         
+        # Repeat texture 5 times across the ground for better visualization
+        tex_repeat = 5.0
+        
         vertices = [
             # Position (3), Normal (3), Texture Coords (2)
             # Triangle 1
-            -half, -0.05, -half,  normal_x, normal_y, normal_z,  0.0, 0.0,
-            half, -0.05, -half,  normal_x, normal_y, normal_z,  1.0, 0.0,
-            half, -0.05,  half,  normal_x, normal_y, normal_z,  1.0, 1.0,
+            -half, -0.25, -half,  normal_x, normal_y, normal_z,  0.0, 0.0,
+            half, -0.25, -half,  normal_x, normal_y, normal_z,  tex_repeat, 0.0,
+            half, -0.25,  half,  normal_x, normal_y, normal_z,  tex_repeat, tex_repeat,
             
             # Triangle 2  
-            half, -0.05,  half,  normal_x, normal_y, normal_z,  1.0, 1.0,
-            -half, -0.05,  half,  normal_x, normal_y, normal_z,  0.0, 1.0,
-            -half, -0.05, -half,  normal_x, normal_y, normal_z,  0.0, 0.0,
+            half, -0.25,  half,  normal_x, normal_y, normal_z,  tex_repeat, tex_repeat,
+            -half, -0.25,  half,  normal_x, normal_y, normal_z,  0.0, tex_repeat,
+            -half, -0.25, -half,  normal_x, normal_y, normal_z,  0.0, 0.0,
         ]
         
         return np.array(vertices, dtype=np.float32)

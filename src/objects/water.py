@@ -20,7 +20,7 @@ class Water:
         """Create water mesh with texture coordinates."""
         vertices = []
         width = 7.8
-        length = 19.8
+        length = 50.0
         base_height = -0.05  # Water now above ground
         segments_x = 20
         segments_z = 40

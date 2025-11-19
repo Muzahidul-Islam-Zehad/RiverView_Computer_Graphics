@@ -40,7 +40,7 @@ class Road:
         
         road_model = create_model_matrix(
             position=(2.0, 0.1, 0.0),
-            scale=(0.5, 1.0, 1.5)
+            scale=(0.25, 1.0, 4.0)  # Extended length
         )
         self.shader.set_mat4("model", road_model)
         self.shader.set_bool("useTexture", True)  # FORCE TEXTURE

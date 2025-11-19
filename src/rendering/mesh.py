@@ -20,7 +20,7 @@ class Mesh:
         self._setup_mesh()
     
     def _setup_mesh(self):
-        """Setup VAO, VBO, and optionally EBO."""
+        """Setup VAO, VBO for vertex data."""
         self.vao = gl.glGenVertexArrays(1)
         self.vbo = gl.glGenBuffers(1)
         
@@ -33,16 +33,22 @@ class Mesh:
             gl.glBindBuffer(gl.GL_ELEMENT_ARRAY_BUFFER, self.ebo)
             gl.glBufferData(gl.GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices, gl.GL_STATIC_DRAW)
         
-        # Vertex attributes (position, normal, texcoords)
-        gl.glVertexAttribPointer(0, 3, gl.GL_FLOAT, gl.GL_FALSE, 8 * 4, None)
+        # Vertex attributes: position(3), normal(3), texcoords(2) = 8 floats
+        stride = 8 * 4
+        
+        # Position
+        gl.glVertexAttribPointer(0, 3, gl.GL_FLOAT, gl.GL_FALSE, stride, None)
         gl.glEnableVertexAttribArray(0)
-        gl.glVertexAttribPointer(1, 3, gl.GL_FLOAT, gl.GL_FALSE, 8 * 4, gl.ctypes.c_void_p(3 * 4))
+        
+        # Normal
+        gl.glVertexAttribPointer(1, 3, gl.GL_FLOAT, gl.GL_FALSE, stride, gl.ctypes.c_void_p(3 * 4))
         gl.glEnableVertexAttribArray(1)
-        gl.glVertexAttribPointer(2, 2, gl.GL_FLOAT, gl.GL_FALSE, 8 * 4, gl.ctypes.c_void_p(6 * 4))
+        
+        # Texture coordinates
+        gl.glVertexAttribPointer(2, 2, gl.GL_FLOAT, gl.GL_FALSE, stride, gl.ctypes.c_void_p(6 * 4))
         gl.glEnableVertexAttribArray(2)
         
         gl.glBindVertexArray(0)
-    
     def draw(self, shader):
         """Render the mesh with texture."""
         # Bind texture if available
