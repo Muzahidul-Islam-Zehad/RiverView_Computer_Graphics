@@ -35,7 +35,6 @@ void main()
     vec3 result;
     if(useTexture) {
         vec4 textureColor = texture(texture_diffuse1, TexCoords);
-        textureColor.rgb *= vec3(1.1, 1.0, 0.9);
         result = (ambient + diffuse + specular) * textureColor.rgb;
     } else {
         // USE OBJECT COLOR from uniform

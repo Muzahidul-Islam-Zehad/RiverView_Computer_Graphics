@@ -18,6 +18,18 @@ class Texture:
             
             # Load image
             image = Image.open(filepath)
+            
+            # Convert RGBA to RGB if it has an alpha channel
+            if image.mode == 'RGBA':
+                print(f"Converting RGBA to RGB (removing transparency)")
+                # Create a white background
+                background = Image.new('RGB', image.size, (255, 255, 255))
+                # Paste the image on the white background using the alpha channel as mask
+                background.paste(image, mask=image.split()[3])
+                image = background
+            elif image.mode != 'RGB':
+                image = image.convert('RGB')
+            
             image = image.transpose(Image.FLIP_TOP_BOTTOM)
             img_data = np.array(image, dtype=np.uint8)
             
@@ -31,17 +43,8 @@ class Texture:
             gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
             gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
             
-            # Determine format
-            if len(img_data.shape) == 3 and img_data.shape[2] == 4:
-                format = gl.GL_RGBA
-            elif len(img_data.shape) == 3 and img_data.shape[2] == 3:
-                format = gl.GL_RGB
-            else:
-                format = gl.GL_RGB
-                # Convert grayscale to RGB
-                if len(img_data.shape) == 2:
-                    rgb_data = np.stack([img_data, img_data, img_data], axis=2)
-                    img_data = rgb_data
+            # Always use RGB format now (no transparency)
+            format = gl.GL_RGB
             
             # Upload texture data
             gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, format, image.width, image.height, 

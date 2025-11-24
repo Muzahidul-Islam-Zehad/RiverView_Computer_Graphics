@@ -11,7 +11,8 @@ from config import *
 from core.shader import Shader
 from core.camera import Camera
 from objects.terrain import Terrain
-from objects.house import House
+from objects.house import AdvancedHouse
+from objects.roof import PyramidRoof
 from objects.bridge import Bridge
 from objects.road import Road
 from objects.car import Car
@@ -29,6 +30,7 @@ class Application:
         self.shader = None
         self.terrain = None
         self.house = None
+        self.roof = None
         self.camera = None
         self.bridge = None
         self.road = None
@@ -108,18 +110,21 @@ class Application:
             
             # Create objects
             self.camera = Camera()
-            self.terrain = Terrain(self.shader)  # Uses main shader
-            self.house = House(self.shader)
+            self.terrain = Terrain(self.shader) 
+            self.house = AdvancedHouse(self.shader)
+            self.roof = PyramidRoof(self.shader)
             self.bridge = Bridge(self.shader)
             self.road = Road(self.shader)
             self.car1 = Car(self.shader)
             self.car2 = Car(self.shader)
-            self.water = Water(self.water_shader)  # Uses WATER shader
+            self.water = Water(self.water_shader)
             
             # Create advanced mountains
             self.mountains = [
-                AdvancedMountain(self.shader, position=(7.0, -1.0, -12.0), size=12.0, max_height=8.0, seed=1),  # Right back (further back)
+                AdvancedMountain(self.shader, position=(7.0, -1.0, -12.0), size=12.0, max_height=8.0, seed=1),  # Right back
                 AdvancedMountain(self.shader, position=(10.0, -1.0, -3.0), size=12.0, max_height=8.0, seed=2),    # Right front
+                AdvancedMountain(self.shader, position=(-12.0, -1.0, -12.0), size=12.0, max_height=8.0, seed=3),   # Left back
+                AdvancedMountain(self.shader, position=(-14.0, -1.0, -3.0), size=12.0, max_height=8.0, seed=4),    # Left front
             ]
             
             # Create advanced trees
@@ -236,7 +241,10 @@ class Application:
         # 3. Draw other objects - use main shader
         self.road.draw(view, projection, light_pos, view_pos)
         self.bridge.draw(view, projection, light_pos, view_pos)
-        self.house.draw(view, projection, light_pos, view_pos, position=(5.0, 0.5, 0.0))
+        self.house.draw(view, projection, light_pos, view_pos, position=(5.0, -0.25, 0.0))
+        
+        # Draw pyramid roof (positioned above house)
+        self.roof.draw(view, projection, light_pos, view_pos, position=(5.0, 0.55, 0.0))
         
         # 4. Draw moving objects
         self.car1.draw(view, projection, light_pos, view_pos)

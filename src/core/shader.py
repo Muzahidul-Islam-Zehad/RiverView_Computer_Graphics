@@ -100,3 +100,7 @@ class Shader:
             gl.GL_FALSE, 
             matrix_array
         )
+    
+    def set_sampler(self, name, texture_unit):
+        """Set a sampler uniform to point to a texture unit."""
+        gl.glUniform1i(gl.glGetUniformLocation(self.program_id, name), texture_unit)

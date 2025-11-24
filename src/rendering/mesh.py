@@ -51,13 +51,12 @@ class Mesh:
         gl.glBindVertexArray(0)
     def draw(self, shader):
         """Render the mesh with texture."""
-        # Bind texture if available
+        # Only set texture if mesh has its own texture
+        # Otherwise, let the caller handle texture settings
         if self.texture:
             self.texture.bind(0)
             shader.set_bool("useTexture", True)
-            shader.set_int("texture0", 0)
-        else:
-            shader.set_bool("useTexture", False)
+            shader.set_sampler("texture_diffuse1", 0)
         
         gl.glBindVertexArray(self.vao)
         

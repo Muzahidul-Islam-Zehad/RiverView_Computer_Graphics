@@ -7,19 +7,30 @@ import numpy as np
 from rendering.mesh import Mesh
 from objects.primitives import create_cube_with_uv
 from utils.transformations import create_model_matrix
+from core.texture import Texture
 
 class Bridge:
     def __init__(self, shader):
         self.shader = shader
         self.cube_mesh = None
         self.cylinder_mesh = None
+        self.bridge_texture = None
         
         self._setup_bridge()
     
     def _setup_bridge(self):
         """Setup bridge components."""
         cube_vertices = create_cube_with_uv()
-        self.cube_mesh = Mesh(cube_vertices)
+        # Create mesh WITHOUT texture - we'll handle it in draw()
+        self.cube_mesh = Mesh(cube_vertices, texture=None)
+        
+        # Load bridge deck texture
+        try:
+            self.bridge_texture = Texture("assets/textures/bridgeLen.png")
+            print(f"✅ Bridge texture loaded: {self.bridge_texture.texture_id}")
+        except Exception as e:
+            print(f"Bridge texture not found: {e}")
+            self.bridge_texture = None
     
     def _draw_cylinder(self, position, scale, color):
         """Draw a cylinder approximation using scaled cube."""
@@ -58,6 +69,12 @@ class Bridge:
         )
         self.shader.set_mat4("model", left_tower_col1_model)
         self.shader.set_vec3("objectColor", tower_color)
+        if self.bridge_texture:
+            self.bridge_texture.bind(0)
+            self.shader.set_sampler("texture_diffuse1", 0)
+            self.shader.set_bool("useTexture", True)
+        else:
+            self.shader.set_bool("useTexture", False)
         self.cube_mesh.draw(self.shader)
         
         # Left tower - second column on LEFT SIDE of bridge
@@ -67,6 +84,12 @@ class Bridge:
         )
         self.shader.set_mat4("model", left_tower_col2_model)
         self.shader.set_vec3("objectColor", tower_color)
+        if self.bridge_texture:
+            self.bridge_texture.bind(0)
+            self.shader.set_sampler("texture_diffuse1", 0)
+            self.shader.set_bool("useTexture", True)
+        else:
+            self.shader.set_bool("useTexture", False)
         self.cube_mesh.draw(self.shader)
         
         # Right tower - positioned on RIGHT SIDE of bridge
@@ -76,6 +99,12 @@ class Bridge:
         )
         self.shader.set_mat4("model", right_tower_col1_model)
         self.shader.set_vec3("objectColor", tower_color)
+        if self.bridge_texture:
+            self.bridge_texture.bind(0)
+            self.shader.set_sampler("texture_diffuse1", 0)
+            self.shader.set_bool("useTexture", True)
+        else:
+            self.shader.set_bool("useTexture", False)
         self.cube_mesh.draw(self.shader)
         
         # Right tower - second column on RIGHT SIDE of bridge
@@ -85,6 +114,12 @@ class Bridge:
         )
         self.shader.set_mat4("model", right_tower_col2_model)
         self.shader.set_vec3("objectColor", tower_color)
+        if self.bridge_texture:
+            self.bridge_texture.bind(0)
+            self.shader.set_sampler("texture_diffuse1", 0)
+            self.shader.set_bool("useTexture", True)
+        else:
+            self.shader.set_bool("useTexture", False)
         self.cube_mesh.draw(self.shader)
         
         # ===== MAIN CABLES (thick steel cables) =====
@@ -138,6 +173,12 @@ class Bridge:
             )
             self.shader.set_mat4("model", left_support)
             self.shader.set_vec3("objectColor", column_color)
+            if self.bridge_texture:
+                self.bridge_texture.bind(0)
+                self.shader.set_sampler("texture_diffuse1", 0)
+                self.shader.set_bool("useTexture", True)
+            else:
+                self.shader.set_bool("useTexture", False)
             self.cube_mesh.draw(self.shader)
             
             # Right side column
@@ -147,7 +188,15 @@ class Bridge:
             )
             self.shader.set_mat4("model", right_support)
             self.shader.set_vec3("objectColor", column_color)
+            if self.bridge_texture:
+                self.bridge_texture.bind(0)
+                self.shader.set_sampler("texture_diffuse1", 0)
+                self.shader.set_bool("useTexture", True)
+            else:
+                self.shader.set_bool("useTexture", False)
             self.cube_mesh.draw(self.shader)
+        
+        self.shader.set_bool("useTexture", False)  # Reset for other objects
         
         # ===== BRIDGE DECK =====
         deck_color = (0.35, 0.32, 0.28)  # Brown-gray asphalt
@@ -157,7 +206,14 @@ class Bridge:
         )
         self.shader.set_mat4("model", deck_model)
         self.shader.set_vec3("objectColor", deck_color)
+        if self.bridge_texture:
+            self.bridge_texture.bind(0)
+            self.shader.set_sampler("texture_diffuse1", 0)
+            self.shader.set_bool("useTexture", True)
+        else:
+            self.shader.set_bool("useTexture", False)
         self.cube_mesh.draw(self.shader)
+        self.shader.set_bool("useTexture", False)  # Reset for other objects
         
         # ===== DECK STRIPES (center line) =====
         stripe_color = (1.0, 1.0, 1.0)  # White
