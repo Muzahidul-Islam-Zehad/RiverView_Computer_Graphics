@@ -7,6 +7,7 @@ import OpenGL.GL as gl
 import numpy as np
 import random
 import math
+import glm
 from config import *
 from core.shader import Shader
 from core.camera import Camera
@@ -21,6 +22,7 @@ from objects.log import Log
 from objects.water import Water
 from objects.mountain import Mountain
 from objects.advanced_mountain import AdvancedMountain
+from objects.christmas_tree import ChristmasTree
 from utils.transformations import create_projection_matrix, create_projection_matrix_from_camera
 
 class Application:
@@ -40,6 +42,7 @@ class Application:
         self.logs = []
         self.water = None
         self.mountains = []
+        self.christmas_trees = []
         
         # Mouse handling
         self.first_mouse = True
@@ -149,6 +152,22 @@ class Application:
                 log_y = 0.5  # At middle of tree
                 log_pos = (tree_pos[0], log_y, tree_pos[2])
                 self.logs.append((log, log_pos, 0.0))
+            
+            # Create Christmas tree forest filling empty GROUND on left side of river
+            self.christmas_trees = []
+            # Fill the flat ground areas between mountains and river on left side
+            random.seed(42)  # For consistent placement
+            
+            # Ground area between left mountains and river (X: -8 to -11, Z: -10 to 8)
+            for i in range(100):
+                x = -8.5 - random.uniform(0, 3)  # Between mountains and river (X: -8.5 to -11.5)
+                z = -10.0 + random.uniform(-5, 15)  # Safe ground area (Z: -15 to 5)
+                tree = ChristmasTree(self.shader)
+                self.christmas_trees.append({
+                    'tree': tree,
+                    'position': (x, -0.25, z),
+                    'scale': 0.4 + random.uniform(0, 0.9)  # Random height scale 0.4 to 1.3
+                })
                 
         except Exception as e:
             print(f"Initialization error: {e}")
@@ -272,6 +291,41 @@ class Application:
         # 5.5 Draw logs around trees
         for log, log_pos, log_rot in self.logs:
             log.draw(view, projection, light_pos, view_pos, log_pos, log_rot)
+        
+        # 6. Draw Christmas tree forest on left side of river
+        self.shader.use()
+        self.shader.set_mat4("view", view)
+        self.shader.set_mat4("projection", projection)
+        self.shader.set_vec3("lightPos", light_pos)
+        self.shader.set_vec3("viewPos", view_pos)
+        self.shader.set_vec3("lightColor", (1.0, 1.0, 1.0))
+        
+        for tree_data in self.christmas_trees:
+            tree = tree_data['tree']
+            pos = tree_data['position']
+            scale = tree_data['scale']
+            
+            # Bind tree texture if available
+            if tree.tree_texture:
+                tree.tree_texture.bind(0)
+                self.shader.set_sampler("texture_diffuse1", 0)
+                self.shader.set_bool("useTexture", True)
+            else:
+                self.shader.set_bool("useTexture", False)
+            
+            for part in tree.tree_parts:
+                # Create model matrix with scale
+                part_pos = (
+                    pos[0] + part['position'][0] * scale,
+                    pos[1] + part['position'][1] * scale,
+                    pos[2] + part['position'][2] * scale
+                )
+                model = glm.translate(glm.mat4(1.0), glm.vec3(part_pos[0], part_pos[1], part_pos[2]))
+                model = glm.scale(model, glm.vec3(scale, scale, scale))
+                
+                self.shader.set_mat4("model", model)
+                self.shader.set_vec3("objectColor", part['color'])
+                part['mesh'].draw(self.shader)
     
     def _shutdown(self):
         """Cleanup resources."""

@@ -8,15 +8,15 @@ import numpy as np
 class Camera:
     def __init__(self):
         # Camera attributes
-        self.position = glm.vec3(0.0, 3.0, 10.0)
-        self.front = glm.vec3(0.0, 0.0, -1.0)
+        self.position = glm.vec3(-8.0, 4.0, 5.0)  # Position to view left side forest
+        self.front = glm.vec3(0.2, -0.3, -1.0)  # Look toward the river and trees
         self.up = glm.vec3(0.0, 1.0, 0.0)
         self.right = glm.vec3(1.0, 0.0, 0.0)
         self.world_up = glm.vec3(0.0, 1.0, 0.0)
         
         # Euler angles
-        self.yaw = -90.0
-        self.pitch = 0.0
+        self.yaw = -60.0
+        self.pitch = -15.0
         
         # Camera options
         self.movement_speed = 5.0
