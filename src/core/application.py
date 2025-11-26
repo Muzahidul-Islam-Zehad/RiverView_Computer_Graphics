@@ -16,13 +16,15 @@ from objects.house import AdvancedHouse
 from objects.roof import PyramidRoof
 from objects.bridge import Bridge
 from objects.road import Road
-from objects.car import Car
+from objects.car import ProceduralCar
 from objects.advanced_tree import AdvancedTree
 from objects.log import Log
 from objects.water import Water
 from objects.mountain import Mountain
 from objects.advanced_mountain import AdvancedMountain
 from objects.christmas_tree import ChristmasTree
+from objects.clouds import CloudSystem
+from objects.smoke import SmokeSystem
 from utils.transformations import create_projection_matrix, create_projection_matrix_from_camera
 
 class Application:
@@ -36,13 +38,14 @@ class Application:
         self.camera = None
         self.bridge = None
         self.road = None
-        self.car1 = None
-        self.car2 = None
+        self.cars = []
         self.trees = []
         self.logs = []
         self.water = None
         self.mountains = []
         self.christmas_trees = []
+        self.cloud_system = None
+        self.smoke_system = None
         
         # Mouse handling
         self.first_mouse = True
@@ -118,8 +121,40 @@ class Application:
             self.roof = PyramidRoof(self.shader)
             self.bridge = Bridge(self.shader)
             self.road = Road(self.shader)
-            self.car1 = Car(self.shader)
-            self.car2 = Car(self.shader)
+            
+            # Create procedural Tesla cars on two lanes of the ROAD
+            # Left lane (X=1.5) - cars going forward
+            for i in range(3):
+                car = ProceduralCar(self.shader, lane=0, direction=1, car_index=i)
+                car.position[2] = -10.0 + i * 6.0
+                self.cars.append(car)
+            
+            # Right lane (X=2.5) - cars going backward
+            for i in range(3):
+                car = ProceduralCar(self.shader, lane=1, direction=-1, car_index=i+3)
+                car.position[2] = 10.0 - i * 6.0
+                self.cars.append(car)
+            
+            # Create procedural Tesla cars on the BRIDGE
+            # Bridge is at Z=-8.0, spans from X=-28 to X22 (center at -3)
+            # Bridge deck is at Y=1.8, width is 3.0, so lanes at roughly Z=-8.5 and Z=-7.5
+            
+            # Left lane (Z=-8.5) - cars going forward along X-axis
+            for i in range(2):
+                car = ProceduralCar(self.shader, lane=0, direction=1, car_index=i+6, is_bridge=True)
+                car.position[0] = -20.0 + i * 10.0  # Spread along bridge length
+                car.position[1] = 1.8  # Bridge deck height
+                car.position[2] = -8.5  # Left lane of bridge
+                self.cars.append(car)
+            
+            # Right lane (Z=-7.5) - cars going backward along X-axis
+            for i in range(2):
+                car = ProceduralCar(self.shader, lane=1, direction=-1, car_index=i+8, is_bridge=True)
+                car.position[0] = 15.0 - i * 10.0  # Spread along bridge length
+                car.position[1] = 1.8  # Bridge deck height
+                car.position[2] = -7.5  # Right lane of bridge
+                self.cars.append(car)
+            
             self.water = Water(self.water_shader)
             
             # Create advanced mountains
@@ -168,6 +203,12 @@ class Application:
                     'position': (x, -0.25, z),
                     'scale': 0.4 + random.uniform(0, 0.9)  # Random height scale 0.4 to 1.3
                 })
+            
+            # Create cloud system for dynamic sky
+            self.cloud_system = CloudSystem(self.shader, num_clouds=8)
+            
+            # Create smoke system from chimney (house chimney is at X=5.0, positioned above roof)
+            self.smoke_system = SmokeSystem(self.shader, chimney_position=(5.0, 1.5, 0.0))
                 
         except Exception as e:
             print(f"Initialization error: {e}")
@@ -237,9 +278,13 @@ class Application:
         view_pos = (self.camera.position.x, self.camera.position.y, self.camera.position.z)
         
         # Update animated objects
-        self.car1.update(delta_time)
-        self.car2.update(delta_time)
+        for car in self.cars:
+            car.update(delta_time)
         self.water.update(delta_time)
+        if self.cloud_system:
+            self.cloud_system.update(delta_time)
+        if self.smoke_system:
+            self.smoke_system.update(delta_time)
         
         # Set time uniform for main shader
         self.shader.use()
@@ -247,17 +292,25 @@ class Application:
         
         # CORRECT RENDER ORDER:
         
-        # 0. Draw advanced mountains (terrain generation with noise)
+        # 0. Draw clouds (sky) - render first so they appear in background
+        if self.cloud_system:
+            self.cloud_system.draw(view, projection, light_pos, view_pos)
+        
+        # 1. Draw advanced mountains (terrain generation with noise)
         for mountain in self.mountains:
             mountain.draw(view, projection, light_pos, view_pos)
         
-        # 1. Draw terrain (ground and river channel) - uses main shader
+        # 1. Draw advanced mountains (terrain generation with noise)
+        for mountain in self.mountains:
+            mountain.draw(view, projection, light_pos, view_pos)
+        
+        # 2. Draw terrain (ground and river channel) - uses main shader
         self.terrain.draw(view, projection, light_pos, view_pos)
         
-        # 2. Draw water - uses WATER SHADER (different from terrain!)
+        # 3. Draw water - uses WATER SHADER (different from terrain!)
         self.water.draw(view, projection, light_pos, view_pos)
         
-        # 3. Draw other objects - use main shader
+        # 4. Draw other objects - use main shader
         self.road.draw(view, projection, light_pos, view_pos)
         self.bridge.draw(view, projection, light_pos, view_pos)
         self.house.draw(view, projection, light_pos, view_pos, position=(5.0, -0.25, 0.0))
@@ -265,16 +318,11 @@ class Application:
         # Draw pyramid roof (positioned above house)
         self.roof.draw(view, projection, light_pos, view_pos, position=(5.0, 0.55, 0.0))
         
-        # 4. Draw moving objects
-        self.car1.draw(view, projection, light_pos, view_pos)
-        self.car2.position[2] = self.car1.position[2] - 4.0
-        self.car2.draw(view, projection, light_pos, view_pos)
+        # 5. Draw procedural cars on the road
+        for car in self.cars:
+            car.draw(view, projection, light_pos, view_pos)
         
-        # DEBUG: Check which shader water is using
-        # print(f"Water shader program: {self.water.shader.program_id}")
-        # print(f"Main shader program: {self.shader.program_id}")
-        
-        # 5. Draw trees
+        # 6. Draw trees
         tree_positions = [
             (6.0, 0.0, 2.0),
             (7.0, 0.0, -1.0),
@@ -288,11 +336,11 @@ class Application:
                 tree.position = tree_positions[i]
                 tree.draw(view, projection, light_pos, view_pos)
         
-        # 5.5 Draw logs around trees
+        # 6.5 Draw logs around trees
         for log, log_pos, log_rot in self.logs:
             log.draw(view, projection, light_pos, view_pos, log_pos, log_rot)
         
-        # 6. Draw Christmas tree forest on left side of river
+        # 7. Draw Christmas tree forest on left side of river
         self.shader.use()
         self.shader.set_mat4("view", view)
         self.shader.set_mat4("projection", projection)
@@ -326,6 +374,10 @@ class Application:
                 self.shader.set_mat4("model", model)
                 self.shader.set_vec3("objectColor", part['color'])
                 part['mesh'].draw(self.shader)
+        
+        # 8. Draw smoke from chimney
+        if self.smoke_system:
+            self.smoke_system.draw(view, projection, light_pos, view_pos)
     
     def _shutdown(self):
         """Cleanup resources."""
