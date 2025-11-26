@@ -74,6 +74,7 @@ class AdvancedMountain:
         heightmap = self._generate_heightmap(width, depth)
         
         vertices = []
+        tex_repeat = 5.0  # Repeat texture 5 times across mountain
         
         # Generate mesh from heightmap
         for i in range(depth - 1):
@@ -92,14 +93,14 @@ class AdvancedMountain:
                 normal = [0.0, 1.0, 0.0]
                 
                 # Triangle 1
-                vertices.extend([x00, h00, z00, normal[0], normal[1], normal[2], j/width, i/depth])
-                vertices.extend([x10, h10, z00, normal[0], normal[1], normal[2], (j+1)/width, i/depth])
-                vertices.extend([x10, h11, z10, normal[0], normal[1], normal[2], (j+1)/width, (i+1)/depth])
+                vertices.extend([x00, h00, z00, normal[0], normal[1], normal[2], (j/width)*tex_repeat, (i/depth)*tex_repeat])
+                vertices.extend([x10, h10, z00, normal[0], normal[1], normal[2], ((j+1)/width)*tex_repeat, (i/depth)*tex_repeat])
+                vertices.extend([x10, h11, z10, normal[0], normal[1], normal[2], ((j+1)/width)*tex_repeat, ((i+1)/depth)*tex_repeat])
                 
                 # Triangle 2
-                vertices.extend([x00, h00, z00, normal[0], normal[1], normal[2], j/width, i/depth])
-                vertices.extend([x10, h11, z10, normal[0], normal[1], normal[2], (j+1)/width, (i+1)/depth])
-                vertices.extend([x00, h01, z10, normal[0], normal[1], normal[2], j/width, (i+1)/depth])
+                vertices.extend([x00, h00, z00, normal[0], normal[1], normal[2], (j/width)*tex_repeat, (i/depth)*tex_repeat])
+                vertices.extend([x10, h11, z10, normal[0], normal[1], normal[2], ((j+1)/width)*tex_repeat, ((i+1)/depth)*tex_repeat])
+                vertices.extend([x00, h01, z10, normal[0], normal[1], normal[2], (j/width)*tex_repeat, ((i+1)/depth)*tex_repeat])
         
         self.mountain_mesh = Mesh(np.array(vertices, dtype=np.float32), texture=self.texture)
         print("✅ Advanced mountain generated!")

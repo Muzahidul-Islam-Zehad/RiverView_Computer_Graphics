@@ -228,6 +228,10 @@ class SmokeSystem:
             
             particle = SmokeParticle(position, velocity, lifetime=2.5)
             self.particles.append(particle)
+            
+            # Particle cap: prevent excessive particle count (performance safeguard)
+            if len(self.particles) > 100:
+                self.particles.pop(0)  # Remove oldest particle
     
     def update(self, delta_time):
         """Update all smoke particles."""
@@ -237,8 +241,8 @@ class SmokeSystem:
         self.particles = [p for p in self.particles if p.update(delta_time)]
     
     def draw(self, view, projection, light_pos, view_pos):
-        """Render all smoke particles."""
-        if SmokeSystem._smoke_mesh is None or SmokeSystem._smoke_texture is None:
+        """Render all smoke particles with optimized batching."""
+        if not self.particles or SmokeSystem._smoke_mesh is None or SmokeSystem._smoke_texture is None:
             return
         
         self.shader.use()
@@ -251,6 +255,13 @@ class SmokeSystem:
         # Enable blending with additive mode to hide black background from cloud.png
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_COLOR, GL_ONE)  # Additive blend: ignore black, show white/colors
+        
+        # Bind texture ONCE for all particles (major optimization)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, SmokeSystem._smoke_texture.texture_id)
+        self.shader.set_sampler("texture1", 0)
+        self.shader.set_bool("useTexture", True)
+        self.shader.set_vec3("objectColor", (1.0, 1.0, 1.0))  # White to blend with cloud texture
         
         # Draw each particle
         for particle in self.particles:
@@ -270,14 +281,7 @@ class SmokeSystem:
             ))
             
             self.shader.set_mat4("model", model)
-            self.shader.set_vec3("objectColor", (1.0, 1.0, 1.0))  # White to blend with cloud texture
             self.shader.set_float("alpha_override", alpha)  # Pass alpha to shader
-            self.shader.set_bool("useTexture", True)
-            
-            if SmokeSystem._smoke_texture:
-                glActiveTexture(GL_TEXTURE0)
-                glBindTexture(GL_TEXTURE_2D, SmokeSystem._smoke_texture.texture_id)
-                self.shader.set_sampler("texture1", 0)
             
             SmokeSystem._smoke_mesh.draw(self.shader)
         

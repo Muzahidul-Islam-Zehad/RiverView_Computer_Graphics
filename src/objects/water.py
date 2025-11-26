@@ -19,9 +19,9 @@ class Water:
     def _create_water_vertices(self):
         """Create water mesh with texture coordinates."""
         vertices = []
-        width = 7.8
+        width = 8.0
         length = 50.0
-        base_height = -0.05  # Water now above ground
+        base_height = -0.35  # Water lowered into river channel
         segments_x = 20
         segments_z = 40
         

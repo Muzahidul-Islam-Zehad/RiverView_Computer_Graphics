@@ -197,12 +197,12 @@ class ProceduralCar:
         
         if is_bridge:
             # Bridge cars - positioned by X coordinate, fixed Z
-            self.position = [0.0, 0.1, 0.0]  # Will be set by application
+            self.position = [0.0, -0.1, 0.0]  # Will be set by application
             self.speed = 4.0 * self.direction  # Slightly faster on bridge
         else:
             # Road cars - positioned by Z coordinate, fixed X
             x_pos = 1.5 if lane == 0 else 2.5
-            self.position = [x_pos, 0.1, 0.0]  # Will be set by application
+            self.position = [x_pos, -0.1, 0.0]  # Will be set by application
             self.speed = 3.0 * self.direction
         
         self._wheel_spin = 0.0

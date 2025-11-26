@@ -25,6 +25,7 @@ from objects.advanced_mountain import AdvancedMountain
 from objects.christmas_tree import ChristmasTree
 from objects.clouds import CloudSystem
 from objects.smoke import SmokeSystem
+from objects.ship import Ship
 from utils.transformations import create_projection_matrix, create_projection_matrix_from_camera
 
 class Application:
@@ -46,6 +47,7 @@ class Application:
         self.christmas_trees = []
         self.cloud_system = None
         self.smoke_system = None
+        self.ship = None
         
         # Mouse handling
         self.first_mouse = True
@@ -209,6 +211,9 @@ class Application:
             
             # Create smoke system from chimney (house chimney is at X=5.0, positioned above roof)
             self.smoke_system = SmokeSystem(self.shader, chimney_position=(5.0, 1.5, 0.0))
+            
+            # Create ship on the river (river center is at X=-3.0, Y slightly above water)
+            self.ship = Ship(self.shader, position=(-3.0, 0.1, 0.0))
                 
         except Exception as e:
             print(f"Initialization error: {e}")
@@ -285,6 +290,8 @@ class Application:
             self.cloud_system.update(delta_time)
         if self.smoke_system:
             self.smoke_system.update(delta_time)
+        if self.ship:
+            self.ship.update(delta_time)
         
         # Set time uniform for main shader
         self.shader.use()
@@ -300,15 +307,15 @@ class Application:
         for mountain in self.mountains:
             mountain.draw(view, projection, light_pos, view_pos)
         
-        # 1. Draw advanced mountains (terrain generation with noise)
-        for mountain in self.mountains:
-            mountain.draw(view, projection, light_pos, view_pos)
-        
         # 2. Draw terrain (ground and river channel) - uses main shader
         self.terrain.draw(view, projection, light_pos, view_pos)
         
         # 3. Draw water - uses WATER SHADER (different from terrain!)
         self.water.draw(view, projection, light_pos, view_pos)
+        
+        # 3.5 Draw ship on the river
+        if self.ship:
+            self.ship.draw(view, projection, light_pos, view_pos)
         
         # 4. Draw other objects - use main shader
         self.road.draw(view, projection, light_pos, view_pos)
@@ -348,18 +355,18 @@ class Application:
         self.shader.set_vec3("viewPos", view_pos)
         self.shader.set_vec3("lightColor", (1.0, 1.0, 1.0))
         
+        # Bind texture once for all trees (major optimization)
+        texture_bound = False
+        if self.christmas_trees and self.christmas_trees[0]['tree'].tree_texture:
+            self.christmas_trees[0]['tree'].tree_texture.bind(0)
+            self.shader.set_sampler("texture_diffuse1", 0)
+            self.shader.set_bool("useTexture", True)
+            texture_bound = True
+        
         for tree_data in self.christmas_trees:
             tree = tree_data['tree']
             pos = tree_data['position']
             scale = tree_data['scale']
-            
-            # Bind tree texture if available
-            if tree.tree_texture:
-                tree.tree_texture.bind(0)
-                self.shader.set_sampler("texture_diffuse1", 0)
-                self.shader.set_bool("useTexture", True)
-            else:
-                self.shader.set_bool("useTexture", False)
             
             for part in tree.tree_parts:
                 # Create model matrix with scale
@@ -375,6 +382,9 @@ class Application:
                 self.shader.set_vec3("objectColor", part['color'])
                 part['mesh'].draw(self.shader)
         
+        if not texture_bound:
+            self.shader.set_bool("useTexture", False)
+        
         # 8. Draw smoke from chimney
         if self.smoke_system:
             self.smoke_system.draw(view, projection, light_pos, view_pos)
@@ -382,6 +392,27 @@ class Application:
     def _shutdown(self):
         """Cleanup resources."""
         print("Shutting down...")
+        
+        # DEBUG: Print camera position
+        if self.camera:
+            print("\n" + "="*60)
+            print("DEBUG: CAMERA POSITION AT SHUTDOWN")
+            print("="*60)
+            pos = self.camera.position
+            front = self.camera.front
+            up = self.camera.up
+            yaw = self.camera.yaw
+            pitch = self.camera.pitch
+            
+            print(f"Position: ({pos.x:.2f}, {pos.y:.2f}, {pos.z:.2f})")
+            print(f"Front: ({front.x:.2f}, {front.y:.2f}, {front.z:.2f})")
+            print(f"Up: ({up.x:.2f}, {up.y:.2f}, {up.z:.2f})")
+            print(f"Yaw: {yaw:.2f}°")
+            print(f"Pitch: {pitch:.2f}°")
+            print("="*60)
+            print("\nTo use this position, copy these values to the Camera initialization")
+            print("="*60 + "\n")
+        
         if self.window:
             glfw.destroy_window(self.window)
         glfw.terminate()

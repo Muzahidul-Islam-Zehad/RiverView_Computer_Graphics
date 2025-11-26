@@ -207,7 +207,7 @@ class Cloud:
         if Cloud._cloud_mesh is None:
             return
         
-        # Load texture if not done
+        # Load texture only once (cached)
         if Cloud._cloud_texture is None:
             self._load_texture_once()
         
@@ -238,6 +238,8 @@ class Cloud:
         Cloud._cloud_mesh.draw(shader)
         
         shader.set_bool("useTexture", False)
+        # Reset blend function
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         # Reset blend function
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
